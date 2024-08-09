@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/testing_octo/static/css/main.7acaea2f.css",
+    "main.js": "/testing_octo/static/js/main.e633ced6.js",
+    "index.html": "/testing_octo/index.html",
+    "main.7acaea2f.css.map": "/testing_octo/static/css/main.7acaea2f.css.map",
+    "main.e633ced6.js.map": "/testing_octo/static/js/main.e633ced6.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.7acaea2f.css",
+    "static/js/main.e633ced6.js"
+  ]
+}
