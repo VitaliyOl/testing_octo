@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+// import React, { useState } from 'react';
 
 import GameInput from './GameInput/GameInput';
 import DateRangePicker from './DateRangePicker/DateRangePicker';
 import GraphDisplay from './GraphDisplay/GraphDisplay';
 
 export const App = () => {
-  const [graphData, setGraphData] = useState({ datasets: [] });
+  // const [graphData, setGraphData] = useState({ datasets: [] });
 
   const datas = {
     labels: Array.from({ length: 30 }, (_, i) => i + 1),
