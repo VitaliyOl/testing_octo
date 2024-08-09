@@ -10,7 +10,7 @@ export const App = () => {
         color: '#010101',
       }}
     >
-      React test template
+      React testing template
     </div>
   );
 };
