@@ -6,6 +6,7 @@ function GameInput({ onSubmit }) {
   const handleSubmit = event => {
     event.preventDefault();
     onSubmit(gameName);
+    setGameName('');
   };
 
   return (
