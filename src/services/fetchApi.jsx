@@ -1,13 +1,7 @@
 import axios from 'axios';
+const { REACT_APP_YOUTUBE_API_KEY } = process.env;
 
-// reserv AIzaSyCDeWup16YF1kUi965hj0FwZIU-z2C88uU
-//reserv AIzaSyA7FNWkfKhiXr4j7uw66tz2uzrYt0BYwIk
-//reserv AIzaSyB9MAoPbhMDg4suczSKXGjfUxof17HQads
-//AIzaSyCeX0yW0phRI-Blvpdql_msZQUctqSelP8
-//AIzaSyB9MAoPbhMDg4suczSKXGjfUxof17HQads
-//AIzaSyCeX0yW0phRI-Blvpdql_msZQUctqSelP8
-
-const API_KEY = 'AIzaSyAiP59ZNGLiaqDfk2sygOjSD_88cFgq7xg';
+const API_KEY = REACT_APP_YOUTUBE_API_KEY;
 
 const fetchYouTubeData = async (query, days) => {
   const startDate = new Date();
@@ -32,6 +26,29 @@ const fetchYouTubeData = async (query, days) => {
   }
 };
 
+async function fetchSteamFollowers() {
+  try {
+    const response = await axios.get(
+      'https://steamdb.info/api/GetGraphFollowers/?appid=730',
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+          Accept: 'application/json',
+          Referer: 'https://steamdb.info/app/730/charts/',
+        },
+      }
+    );
+
+    if (response.data && response.data.success) {
+      console.log('Follower Data:', response.data.data);
+    } else {
+      console.log('Failed to retrieve data.');
+    }
+  } catch (error) {
+    console.error('Error:', error.message);
+  }
+}
+
 // const fetchYouTubeData = async (query, days) => {
 //   const today = new Date();
 //   const startDate = new Date(today.setDate(today.getDate() - days));
@@ -49,6 +66,7 @@ const fetchYouTubeData = async (query, days) => {
 
 const api = {
   fetchYouTubeData,
+  fetchSteamFollowers,
 };
 
 export default api;
@@ -116,7 +134,7 @@ export default api;
 
 //   const config = {
 //     headers: {
-//       Authorization: `AAAAAAAAAAAAAAAAAAAAAFMavQEAAAAACguGizOnJniD1%2B%2BgrdpSFS2qS%2Fc%3D1mXTpGkq5NBA8a3VEhCWLudD8IZvumdcUQ1gvPgbXHlAKovqQG`,
+//       Authorization: `{process.env.REACT_APP_TWIT_API_KEY}`,
 //     },
 //     params: params,
 //   };
