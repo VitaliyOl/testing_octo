@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 
 import GameInput from './GameInput/GameInput';
+import SteamDataDisplay from './SteamDataDisplay/SteamDataDisplay';
+import GameTitle from './GameTitle/GameTitle';
+import GraphSection from './GraphSection/GraphSection';
+
 import api from '../services/fetchApi';
-import GraphDisplay from './GraphDisplay/GraphDisplay';
 
 const periods = [
   { label: '1w', days: 7 },
@@ -12,6 +15,18 @@ const periods = [
   { label: '1y', days: 365 },
 ];
 
+const getFromLocalStorage = (key, defaultValue = null) => {
+  const storedData = localStorage.getItem(key);
+  return storedData ? JSON.parse(storedData) : defaultValue;
+};
+
+const setToLocalStorage = (key, value) => {
+  localStorage.setItem(key, JSON.stringify(value));
+};
+
+const getPeriodByLabel = label =>
+  periods.find(period => period.label === label);
+
 export const App = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [totalMentions, setTotalMentions] = useState(0);
@@ -20,23 +35,55 @@ export const App = () => {
     labels: [],
     datasets: [],
   });
+  const [steamData, setSteamData] = useState(null);
+  const [selectedPeriod, setSelectedPeriod] = useState('1y');
 
   useEffect(() => {
-    const storedGraphData = localStorage.getItem('graphData');
+    const storedGraphData = getFromLocalStorage('graphData', {
+      labels: [],
+      datasets: [],
+    });
     const storedTotalMentions = localStorage.getItem('totalMentions');
     const storedTimeRange = localStorage.getItem('timeRange');
     const storedSearchQuery = localStorage.getItem('searchQuery');
+    const storedSteamData = getFromLocalStorage(
+      `steamData_${storedSearchQuery}`
+    );
+    const storedSelectedPeriod = localStorage.getItem('selectedPeriod');
+
+    if (storedSearchQuery && storedSelectedPeriod) {
+      const period = getPeriodByLabel(storedSelectedPeriod);
+      const cacheKey = `mentions_${storedSearchQuery}_${period.days}`;
+      const cachedData = localStorage.getItem(cacheKey);
+
+      if (cachedData) {
+        const { totalMentions, graphData } = JSON.parse(cachedData);
+        setGraphData(graphData);
+        setTotalMentions(totalMentions);
+        setTimeRange(
+          period.days === 365 ? '1 Year' : `${period.days / 30} Months`
+        );
+        setSelectedPeriod(storedSelectedPeriod);
+        setSearchQuery(storedSearchQuery);
+        if (storedSteamData) setSteamData(storedSteamData);
+        return;
+      }
+    }
 
     if (
       storedGraphData &&
       storedTotalMentions &&
       storedTimeRange &&
-      storedSearchQuery
+      storedSearchQuery &&
+      storedSteamData &&
+      storedSelectedPeriod
     ) {
-      setGraphData(JSON.parse(storedGraphData));
+      setGraphData(storedGraphData);
       setTotalMentions(parseInt(storedTotalMentions, 10));
       setTimeRange(storedTimeRange);
       setSearchQuery(storedSearchQuery);
+      setSteamData(storedSteamData);
+      setSelectedPeriod(storedSelectedPeriod);
     }
   }, []);
 
@@ -51,13 +98,32 @@ export const App = () => {
       labels.push(new Date(d).toISOString().split('T')[0]);
     }
 
-    const baseValue = Math.floor(totalMentions / labels.length);
-    labels.forEach(() => {
-      const variation = 0.8 + Math.random() * 0.4;
-      values.push(baseValue * variation);
+    const baseValue = totalMentions / labels.length;
+    let sum = 0;
+
+    labels.forEach((_, index) => {
+      let variation = 0.9 + Math.random() * 0.2;
+      let value = baseValue * variation;
+      values.push(value);
+      sum += value;
     });
 
+    const correctionFactor = totalMentions / sum;
+    values = values.map(value => Math.round(value * correctionFactor));
+
     setGraphData({
+      labels,
+      datasets: [
+        {
+          label: 'Mentions',
+          data: values,
+          borderColor: 'blue',
+          fill: false,
+        },
+      ],
+    });
+
+    setToLocalStorage('graphData', {
       labels,
       datasets: [
         {
@@ -72,36 +138,88 @@ export const App = () => {
 
   const handleGameSearch = async searchQuery => {
     setSearchQuery(searchQuery);
-    const { totalMentions, startDate, endDate } = await api.fetchYouTubeData(
-      searchQuery,
-      365
-    );
-    setTotalMentions(totalMentions);
-    setTimeRange('1 Year');
-    processGraphData(totalMentions, 365, startDate, endDate);
-  };
 
-  const handlePeriodChange = async days => {
-    const cacheKey = `mentions_${searchQuery}_${days}`;
+    const cachedSteamData = getFromLocalStorage(`steamData_${searchQuery}`);
+    if (cachedSteamData) {
+      setSteamData(cachedSteamData);
+    } else {
+      const response = await api.fetchSteamData(searchQuery);
+      setSteamData(response);
+      setToLocalStorage(`steamData_${searchQuery}`, response);
+    }
+
+    const selectedPeriod = '1y';
+    const period = getPeriodByLabel(selectedPeriod);
+    const cacheKey = `mentions_${searchQuery}_${period.days}`;
     const cachedData = localStorage.getItem(cacheKey);
 
     if (cachedData) {
-      const { totalMentions, startDate, endDate } = JSON.parse(cachedData);
+      const { totalMentions, graphData } = JSON.parse(cachedData);
       setTotalMentions(totalMentions);
-      setTimeRange(`${days === 365 ? '1 Year' : `${days / 30} Months`}`);
-      processGraphData(totalMentions, days, startDate, endDate);
+      setTimeRange('1 Year');
+      setSelectedPeriod('1y');
+      setGraphData(graphData);
+    } else {
+      const { totalMentions, startDate, endDate } = await api.fetchYouTubeData(
+        searchQuery,
+        period.days
+      );
+      setTotalMentions(totalMentions);
+      setTimeRange('1 Year');
+      setSelectedPeriod('1y');
+
+      processGraphData(totalMentions, period.days, startDate, endDate);
+
+      setToLocalStorage(cacheKey, {
+        totalMentions,
+        startDate,
+        endDate,
+        graphData: JSON.parse(localStorage.getItem('graphData')),
+      });
+    }
+
+    localStorage.setItem('totalMentions', totalMentions);
+    localStorage.setItem('timeRange', '1 Year');
+    localStorage.setItem('searchQuery', searchQuery);
+    localStorage.setItem('selectedPeriod', '1y');
+  };
+
+  const handlePeriodChange = async days => {
+    if (!searchQuery) {
+      alert('Please enter a search query first.');
+      return;
+    }
+
+    const cacheKey = `mentions_${searchQuery}_${days}`;
+    const cachedData = localStorage.getItem(cacheKey);
+
+    const periodLabel = periods.find(period => period.days === days).label;
+    setSelectedPeriod(periodLabel);
+
+    localStorage.setItem('selectedPeriod', periodLabel);
+
+    if (cachedData) {
+      const { totalMentions, graphData } = JSON.parse(cachedData);
+      setTotalMentions(totalMentions);
+      setTimeRange(days === 365 ? '1 Year' : `${days / 30} Months`);
+      setGraphData(graphData);
     } else {
       const { totalMentions, startDate, endDate } = await api.fetchYouTubeData(
         searchQuery,
         days
       );
-      localStorage.setItem(
-        cacheKey,
-        JSON.stringify({ totalMentions, startDate, endDate })
-      );
       setTotalMentions(totalMentions);
-      setTimeRange(`${days === 365 ? '1 Year' : `${days / 30} Months`}`);
+      setTimeRange(days === 365 ? '1 Year' : `${days / 30} Months`);
+
       processGraphData(totalMentions, days, startDate, endDate);
+
+      const currentGraphData = getFromLocalStorage('graphData');
+      setToLocalStorage(cacheKey, {
+        totalMentions,
+        startDate,
+        endDate,
+        graphData: currentGraphData,
+      });
     }
   };
 
@@ -110,6 +228,8 @@ export const App = () => {
     setSearchQuery('');
     setTotalMentions(0);
     setTimeRange('');
+    setSteamData(null);
+    setSelectedPeriod('1y');
     setGraphData({
       labels: [],
       datasets: [],
@@ -119,7 +239,6 @@ export const App = () => {
   return (
     <div
       style={{
-        height: '100vh',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -129,29 +248,17 @@ export const App = () => {
         overflowY: 'auto',
       }}
     >
-      <GameInput onSubmit={handleGameSearch} />
-      <button
-        onClick={handleReset}
-        style={{ marginLeft: '20px', background: 'red', color: 'white' }}
-      >
-        Reset
-      </button>
-      <div>
-        {periods.map(period => (
-          <button
-            key={period.label}
-            onClick={() => handlePeriodChange(period.days)}
-          >
-            {period.label}
-          </button>
-        ))}
-      </div>
-      <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-        <h2>Game: {searchQuery}</h2>
-        <h3>Total Mentions: {totalMentions}</h3>
-        <h4>Time Range: {timeRange}</h4>
-      </div>
-      <GraphDisplay data={graphData} />
+      <GameInput onSubmit={handleGameSearch} onReset={handleReset} />
+      <GameTitle searchQuery={searchQuery} />
+      <GraphSection
+        periods={periods}
+        selectedPeriod={selectedPeriod}
+        handlePeriodChange={handlePeriodChange}
+        graphData={graphData}
+        totalMentions={totalMentions}
+        timeRange={timeRange}
+      />
+      {steamData && <SteamDataDisplay steamData={steamData} />}
     </div>
   );
 };
